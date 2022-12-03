@@ -1,5 +1,8 @@
+extern crate regex;
+
 mod day01;
+mod day02;
 
 fn main() {
-    day01::part2::solve()
+    day02::part2::solve()
 }
