@@ -1,6 +1,6 @@
 extern crate regex;
-
 extern crate lazy_static;
+extern crate im;
 
 mod day01;
 mod day02;
@@ -18,9 +18,10 @@ mod day13;
 mod day14;
 mod day15;
 // mod day16;
-mod day17;
+mod day17; // missing part 2
 mod day18;
+mod day19;
 
 fn main() {
-    day18::part2::solve()
+    day19::part1::solve()
 }
