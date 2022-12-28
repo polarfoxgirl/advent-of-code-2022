@@ -23,11 +23,11 @@ mod day18;
 // mod day19; // missing part 1 & 2
 mod day20;
 mod day21;
-// 22
+mod day22;
 mod day23;
 // 24
 mod day25;
 
 fn main() {
-    day23::part2::solve()
+    day22::part2::solve()
 }
