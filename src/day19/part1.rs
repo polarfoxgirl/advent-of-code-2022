@@ -1,8 +1,9 @@
 use std::{fs, ops::{Sub, Add}};
 use regex::Regex;
 use lazy_static::lazy_static;
+use memoize::memoize;
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 struct Resources {
     ore: u16,
     clay: u16,
@@ -33,6 +34,7 @@ impl Sub for Resources {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 struct Blueprint {
     number: u16,
     ore_robot: Resources,
@@ -43,86 +45,90 @@ struct Blueprint {
 
 #[allow(dead_code)]
 pub fn solve() {
-    let blueprints = read_input(String::from("src/day19/inputs/test.txt"));
+    let mut blueprints = read_input(String::from("src/day19/inputs/test.txt"));
     println!("Input count: {}", blueprints.len());
 
-    let result: u16 = blueprints.iter()
-        .map(|b| b.number * optimize_blueprint(b))
-        .sum();
-    println!("Result: {}", result);
+    let first = optimize_blueprint(blueprints.pop().unwrap());
+    println!("First blueprint max: {}", first);
+
+    // let result: u16 = blueprints.iter()
+    //     .map(|b| b.number * optimize_blueprint(b))
+    //     .sum();
+    // println!("Result: {}", result);
 }
 
-fn optimize_blueprint(blueprint: &Blueprint) -> u16 {
+fn optimize_blueprint(blueprint: Blueprint) -> u16 {
     let resources = Resources { ore: 0, clay: 0, obsidian: 0 };
     let robots = (1, 0, 0, 0);
     let geodes = 0;
     let minutes = 24;
 
-    get_max(blueprint, &resources, &robots, &geodes, &minutes)
+    get_max(blueprint, resources, robots, geodes, minutes)
 }
 
-fn get_max(blueprint: &Blueprint, resources: &Resources, robots: &(u16, u16, u16, u16), geodes: &u16, minutes: &u16) -> u16 {
-    if *minutes == 0 {
-        println!("Produced {} geodes", geodes);
-        return *geodes;
+#[memoize]
+fn get_max(blueprint: Blueprint, resources: Resources, robots: (u16, u16, u16, u16), geodes: u16, minutes: u16) -> u16 {
+    if minutes == 0 {
+        return geodes;
     }
 
-    let next_minutes = *minutes - 1;
+    let next_minutes = minutes - 1;
     let (new_resources, new_geods) = produce(robots);
     
-    get_robot_options(blueprint, resources, robots, minutes).into_iter()
+    get_robot_options(blueprint, resources, robots).into_iter()
         .map(|(updated_robots, updated_resorces)| {
-            get_max(blueprint, &(updated_resorces + new_resources), &updated_robots, &(geodes + new_geods), &next_minutes)
+            get_max(blueprint, updated_resorces + new_resources, updated_robots, geodes + new_geods, next_minutes)
         })
         .max()
         .unwrap()
 }
 
-fn produce(robots: &(u16, u16, u16, u16)) -> (Resources, u16) {
+fn produce(robots: (u16, u16, u16, u16)) -> (Resources, u16) {
     let (ore_robots, clay_robots, obsidian_robots, geode_robots) = robots;
 
     (Resources {
-        ore: *ore_robots,
-        clay: *clay_robots,
-        obsidian: *obsidian_robots,
-    }, *geode_robots)
+        ore: ore_robots,
+        clay: clay_robots,
+        obsidian: obsidian_robots,
+    }, geode_robots)
 }
 
-fn get_robot_options(blueprint: &Blueprint, resources: &Resources, robots: &(u16, u16, u16, u16), minutes: &u16) -> Vec<((u16, u16, u16, u16), Resources)> {
+fn get_robot_options(blueprint: Blueprint, resources: Resources, robots: (u16, u16, u16, u16)) -> Vec<((u16, u16, u16, u16), Resources)> {
     let mut results = Vec::new();
     let (ore_robots, clay_robots, obsidian_robots, geode_robots) = robots;
 
-    results.push((*robots, *resources, ));
-
-    if has_enough(resources, &blueprint.ore_robot) {
+    if has_enough(&resources, &blueprint.geode_robot) {
         results.push((
-            (*ore_robots + 1, *clay_robots, *obsidian_robots, *geode_robots), 
-            *resources - blueprint.ore_robot,
+            (ore_robots, clay_robots, obsidian_robots, geode_robots + 1), 
+            resources - blueprint.geode_robot,
+        ));
+
+        return results;
+    }
+
+    results.push((robots, resources));
+
+    if has_enough(&resources, &blueprint.ore_robot) {
+        results.push((
+            (ore_robots + 1, clay_robots, obsidian_robots, geode_robots), 
+            resources - blueprint.ore_robot,
         ));
     }
 
-    if has_enough(resources, &blueprint.clay_robot) {
+    if has_enough(&resources, &blueprint.clay_robot) {
         results.push((
-            (*ore_robots, *clay_robots + 1, *obsidian_robots, *geode_robots), 
-            *resources - blueprint.clay_robot,
+            (ore_robots, clay_robots + 1, obsidian_robots, geode_robots), 
+            resources - blueprint.clay_robot,
         ));
     }
 
-    if has_enough(resources, &blueprint.obsidian_robot) {
+    if has_enough(&resources, &blueprint.obsidian_robot) {
         results.push((
-            (*ore_robots, *clay_robots, *obsidian_robots + 1, *geode_robots), 
-            *resources - blueprint.obsidian_robot,
+            (ore_robots, clay_robots, obsidian_robots + 1, geode_robots), 
+            resources - blueprint.obsidian_robot,
         ));
     }
 
-    if has_enough(resources, &blueprint.geode_robot) {
-        results.push((
-            (*ore_robots, *clay_robots, *obsidian_robots, *geode_robots + 1), 
-            *resources - blueprint.geode_robot,
-        ));
-    }
-
-    println!("Considering {} options on {} minute", results.len(), minutes);
     results
 }
 
@@ -152,7 +158,7 @@ fn read_line(line: &str) -> Blueprint {
             ore_robot: Resources { ore: parse_u16(2), clay: 0, obsidian: 0 },
             clay_robot: Resources { ore: parse_u16(3), clay: 0, obsidian: 0 },
             obsidian_robot: Resources { ore: parse_u16(4), clay: parse_u16(5), obsidian: 0 },
-            geode_robot: Resources { ore: parse_u16(6), clay: parse_u16(7), obsidian: 0 },
+            geode_robot: Resources { ore: 0, clay: parse_u16(6), obsidian: parse_u16(7) },
         };
     }
 

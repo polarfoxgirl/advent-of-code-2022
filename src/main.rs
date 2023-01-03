@@ -29,5 +29,5 @@ mod day24;
 mod day25;
 
 fn main() {
-    day24::part2::solve()
+    day17::part2::solve()
 }
